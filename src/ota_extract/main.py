@@ -3,10 +3,12 @@ import io
 import lzma
 import struct
 import sys
+import json
 from pathlib import Path
 
 import bsdiff4
 import click
+import google.protobuf.json_format as pb_json
 import protos.update_metadata_pb2 as UpdateMetadata
 from tqdm import tqdm
 
@@ -213,8 +215,8 @@ def cli(payload: Path, out_dir: Path, verbose: bool, base_dir: Path, partition_n
         for partition in manifest.partitions:
             click.echo(f"  - {partition.partition_name}")
 
-        if verbose is True:
-            click.echo(f"raw manifest: {manifest}")
+        with Path(f"{out_dir}/manifest.json").open("w") as f:
+            f.write(pb_json.MessageToJson(manifest))
 
         if partition_name != "":
             click.echo(f"Extracting partition {partition_name}...")
