@@ -3,7 +3,6 @@ import io
 import lzma
 import struct
 import sys
-from functools import partial
 from pathlib import Path
 
 import bsdiff4
