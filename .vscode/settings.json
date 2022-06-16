@@ -1,0 +1,11 @@
+{
+    "python.formatting.provider": "black",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Args": ["--config=${workspaceFolder}/setup.cfg"],
+    "[python]": {
+        "editor.wordBasedSuggestions": false,
+        "editor.formatOnSave": true
+    }
+}
