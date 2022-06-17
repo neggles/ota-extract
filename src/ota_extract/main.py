@@ -8,7 +8,7 @@ from pathlib import Path
 import bsdiff4
 import click
 import google.protobuf.json_format as pb_json
-import update_metadata.update_metadata_pb2 as update_metadata_pb2
+import update_metadata.update_metadata_pb2 as update_metadata
 from tqdm import tqdm
 
 
@@ -117,7 +117,7 @@ def execute_op(
         #     raise Exception(f"BROTLI_BSDIFF not supported in non-delta update")
         pass
 
-    raise Exception(f"{update_metadata_pb2.InstallOperation.Type.Name(op.type)} not supported")
+    raise Exception(f"{update_metadata.InstallOperation.Type.Name(op.type)} not supported")
 
 
 def process_partition(
@@ -216,7 +216,7 @@ def cli(payload: Path, out_dir: Path, verbose: bool, base_dir: Path, partition_n
 
         # parse manifest
         click.echo(f"Parsing {manifest_length}-byte manifest... ", nl=False)
-        manifest = update_metadata_pb2.DeltaArchiveManifest()
+        manifest = update_metadata.DeltaArchiveManifest()
         manifest.ParseFromString(manifest_data)
         block_size = manifest.block_size
 
