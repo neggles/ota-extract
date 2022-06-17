@@ -3,7 +3,6 @@ import io
 import lzma
 import struct
 import sys
-import json
 from pathlib import Path
 
 import bsdiff4
