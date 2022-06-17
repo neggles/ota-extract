@@ -39,7 +39,7 @@ def verify_contiguous(exts):
 
 # various payload operations
 def execute_op(
-    op,
+    op: update_metadata.InstallOperation,
     in_file: io.FileIO,
     out_file: io.FileIO,
     base_file: io.FileIO,
@@ -121,7 +121,7 @@ def execute_op(
 
 
 def process_partition(
-    partition,
+    partition: update_metadata.PartitionUpdate,
     block_size: int,
     data_offset: int,
     in_file: io.FileIO,
