@@ -3,13 +3,18 @@ import io
 import lzma
 import struct
 import sys
+import hashlib
 from pathlib import Path
 
 import bsdiff4
 import click
 import google.protobuf.json_format as pb_json
-import update_metadata.update_metadata_pb2 as update_metadata
 from tqdm import tqdm
+from update_metadata.update_metadata_pb2 import (
+    DeltaArchiveManifest,
+    InstallOperation,
+    PartitionUpdate,
+)
 
 
 # flatten list of lists
@@ -38,8 +43,8 @@ def verify_contiguous(exts):
 
 
 # various payload operations
-def execute_op(
-    op: update_metadata.InstallOperation,
+def do_install_op(
+    op: InstallOperation,
     in_file: io.FileIO,
     out_file: io.FileIO,
     base_file: io.FileIO,
@@ -81,7 +86,7 @@ def execute_op(
                 out_file.write(base_file.read(ext.num_blocks * block_size))
             return
 
-        elif op.type == op.SOURCE_BSDIFF:
+        elif op.type == op.BROTLI_BSDIFF or op.type == op.BROTLI_BSDIFF:
             diff_buff = io.BytesIO()
 
             # get base extents
@@ -113,15 +118,15 @@ def execute_op(
             raise Exception(f"SOURCE_COPY not supported in non-delta update")
         elif op.type == op.SOURCE_BSDIFF:
             raise Exception(f"SOURCE_BSDIFF not supported in non-delta update")
-        # elif op.type == op.BROTLI_BSDIFF:
-        #     raise Exception(f"BROTLI_BSDIFF not supported in non-delta update")
+        elif op.type == op.BROTLI_BSDIFF:
+            raise Exception(f"BROTLI_BSDIFF not supported in non-delta update")
         pass
 
-    raise Exception(f"{update_metadata.InstallOperation.Type.Name(op.type)} not supported")
+    raise Exception(f"{InstallOperation.Type.Name(op.type)} not implemented")
 
 
-def process_partition(
-    partition: update_metadata.PartitionUpdate,
+def do_partition_update(
+    partition: PartitionUpdate,
     block_size: int,
     data_offset: int,
     in_file: io.FileIO,
@@ -139,20 +144,28 @@ def process_partition(
 
     out_path = out_dir.joinpath(f"{partition.partition_name}.img")
 
-    with out_path.open("wb") as out_file:
-        for op in tqdm(partition.operations, desc=partition.partition_name, ncols=120, unit="ops"):
-            execute_op(
-                op=op,
-                in_file=in_file,
-                out_file=out_file,
-                base_file=base_file,
-                data_offset=data_offset,
-                block_size=block_size,
-                delta=delta,
+    try:
+        with out_path.open("wb") as out_file:
+            op_iter = tqdm(
+                partition.operations, desc=partition.partition_name, ncols=120, unit="ops"
             )
+            for op in op_iter:
+                do_install_op(
+                    op=op,
+                    in_file=in_file,
+                    out_file=out_file,
+                    base_file=base_file,
+                    data_offset=data_offset,
+                    block_size=block_size,
+                    delta=delta,
+                )
+    except Exception as e:
+        op_iter.write(f"Error extracting partition {partition.partition_name}: {e}")
+        out_path.unlink()
 
-    if base_file is not None:
-        base_file.close()
+    finally:
+        if base_file is not None:
+            base_file.close()
 
 
 @click.command()
@@ -182,13 +195,22 @@ def process_partition(
     default=None,
     help="Path to base partition images for delta OTA",
 )
+@click.option(
+    "-d",
+    "--delta",
+    is_flag=True,
+    default=False,
+    help="Extract delta OTA - requires base partition images",
+)
 @click.argument(
     "partition_name",
     type=str,
     required=False,
     default="",
 )
-def cli(payload: Path, out_dir: Path, verbose: bool, base_dir: Path, partition_name: str):
+def cli(
+    verbose: bool, payload: Path, out_dir: Path, base_dir: Path, delta: bool, partition_name: str
+):
     click.echo(f"Extracting file {payload} to {out_dir}")
     with open(payload, "rb") as in_file:
         file_magic = in_file.read(4)
@@ -211,14 +233,20 @@ def cli(payload: Path, out_dir: Path, verbose: bool, base_dir: Path, partition_n
         signature_length = u32(in_file.read(4))
         manifest_data = in_file.read(manifest_length)
         signature = in_file.read(signature_length)  # we don't check the signature
-        del signature
         data_offset = in_file.tell()
 
         # parse manifest
         click.echo(f"Parsing {manifest_length}-byte manifest... ", nl=False)
-        manifest = update_metadata.DeltaArchiveManifest()
+        manifest = DeltaArchiveManifest()
         manifest.ParseFromString(manifest_data)
         block_size = manifest.block_size
+
+        # hash the manifest and use the last 8 chars in the output subdirectory name
+        # this deals with filename collisions, but is deterministic so repeated runs
+        # on the same payload will always produce the same output directory
+        manifest_hash = hashlib.sha1(signature, usedforsecurity=False).hexdigest()[-8:]
+        out_dir = out_dir.joinpath(in_file.name + "-" + manifest_hash)
+        out_dir.mkdir(parents=True, exist_ok=True)
 
         # print partition names
         click.echo(f"found {len(manifest.partitions)} partitions:")
@@ -228,34 +256,36 @@ def cli(payload: Path, out_dir: Path, verbose: bool, base_dir: Path, partition_n
         with Path(f"{out_dir}/manifest.json").open("w") as f:
             f.write(pb_json.MessageToJson(manifest))
 
-        # create a subdirectory for this payload image
-        out_dir = out_dir.joinpath(in_file.name)
-        out_dir.mkdir(parents=True, exist_ok=True)
-
         if partition_name != "":
             click.echo(f"Extracting partition {partition_name}...")
             for partition in manifest.partitions:
                 if partition.partition_name == partition_name:
-                    process_partition(
+                    do_partition_update(
                         partition=partition,
                         block_size=block_size,
                         data_offset=data_offset,
                         in_file=in_file,
                         out_dir=out_dir,
                         base_dir=base_dir,
+                        delta=delta,
                     )
                     return
             click.echo(f"Partition {partition_name} not found")
             raise Exception("Partition not found")
         else:
             click.echo("Extracting all partitions...")
-            for partition in tqdm(manifest.partitions, ncols=120, desc="Extracting", disable=True):
-                process_partition(
+            partition_iterator = tqdm(
+                manifest.partitions, ncols=120, desc="Extracting", disable=True
+            )
+            for partition in partition_iterator:
+                do_partition_update(
                     partition=partition,
-                    in_file=in_file,
-                    out_dir=out_dir,
                     block_size=block_size,
                     data_offset=data_offset,
+                    in_file=in_file,
+                    out_dir=out_dir,
+                    base_dir=base_dir,
+                    delta=delta,
                 )
 
     click.echo("done")
