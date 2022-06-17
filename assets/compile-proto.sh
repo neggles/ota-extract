@@ -8,7 +8,7 @@ SCRIPT_DIR=$(cd -- "$(dirname "$0")" &>/dev/null; pwd -P)
 pushd ${SCRIPT_DIR}/.. > /dev/null
 
 # compile python module
-protoc --proto_path=assets --python_out=src/protos assets/update_metadata.proto
+protoc --proto_path=assets --python_out=src/update_metadata assets/update_metadata.proto
 
 # return to previous directory
 popd > /dev/null

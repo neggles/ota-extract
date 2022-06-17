@@ -9,7 +9,7 @@ from pathlib import Path
 import bsdiff4
 import click
 import google.protobuf.json_format as pb_json
-import protos.update_metadata_pb2 as UpdateMetadata
+import update_metadata.update_metadata_pb2 as update_metadata_pb2
 from tqdm import tqdm
 
 
@@ -206,7 +206,7 @@ def cli(payload: Path, out_dir: Path, verbose: bool, base_dir: Path, partition_n
 
         # parse manifest
         click.echo(f"Parsing {manifest_length}-byte manifest... ", nl=False)
-        manifest = UpdateMetadata.DeltaArchiveManifest()
+        manifest = update_metadata_pb2.DeltaArchiveManifest()
         manifest.ParseFromString(manifest_data)
         block_size = manifest.block_size
 
