@@ -53,9 +53,8 @@ def execute_op(
     # seek to the output file offset
     out_file.seek(op.dst_extents[0].start_block * block_size)
 
-    if op.type == op.REPLACE_XZ:
-        dec = lzma.LZMADecompressor()
-        out_file.write(dec.decompress(in_file.read(op.data_length)))
+    if op.type == op.REPLACE:
+        out_file.write(in_file.read(op.data_length))
         return
 
     elif op.type == op.REPLACE_BZ:
@@ -63,8 +62,9 @@ def execute_op(
         out_file.write(dec.decompress(in_file.read(op.data_length)))
         return
 
-    elif op.type == op.REPLACE:
-        out_file.write(in_file.read(op.data_length))
+    elif op.type == op.REPLACE_XZ:
+        dec = lzma.LZMADecompressor()
+        out_file.write(dec.decompress(in_file.read(op.data_length)))
         return
 
     elif op.type == op.ZERO:
@@ -108,8 +108,16 @@ def execute_op(
                 out_file.write(data)
             return
         pass
+    else:
+        if op.type == op.SOURCE_COPY:
+            raise Exception(f"SOURCE_COPY not supported in non-delta update")
+        elif op.type == op.SOURCE_BSDIFF:
+            raise Exception(f"SOURCE_BSDIFF not supported in non-delta update")
+        # elif op.type == op.BROTLI_BSDIFF:
+        #     raise Exception(f"BROTLI_BSDIFF not supported in non-delta update")
+        pass
 
-    raise Exception(f"Unsupported operation type: {op.type}")
+    raise Exception(f"{update_metadata_pb2.InstallOperation.Type.Name(op.type)} not supported")
 
 
 def process_partition(
@@ -121,12 +129,15 @@ def process_partition(
     base_dir: Path = None,
     delta: bool = False,
 ):
-    out_path = Path(f"{out_dir}/{partition.partition_name}.img")
-    if delta is True:
-        base_path = Path(f"{base_dir}/{partition.partition_name}.img")
+    if delta is True and base_dir is not None:
+        base_path = base_dir.joinpath(f"{partition.partition_name}.img")
         base_file = base_path.open("rb")
+    elif delta is True:
+        raise Exception("Delta update found and base image directory not specified")
     else:
         base_file = None
+
+    out_path = out_dir.joinpath(f"{partition.partition_name}.img")
 
     with out_path.open("wb") as out_file:
         for op in tqdm(partition.operations, desc=partition.partition_name, ncols=120, unit="ops"):
@@ -146,10 +157,11 @@ def process_partition(
 
 @click.command()
 @click.version_option(package_name="ota-extract")
+@click.option("-v", "--verbose", is_flag=True, default=False, help="Enable verbose console output.")
 @click.option(
     "-p",
     "--payload",
-    type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False),
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
     required=False,
     default="./payload.bin",
     help="Path to the payload file",
@@ -157,16 +169,15 @@ def process_partition(
 @click.option(
     "-o",
     "--out-dir",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=True),
+    type=click.Path(writable=True, file_okay=False, path_type=Path),
     required=False,
     default="./out",
     help="Output directory for extracted files",
 )
-@click.option("-v", "--verbose", is_flag=True, default=False, help="Print verbose output.")
 @click.option(
     "-b",
     "--base-dir",
-    type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False),
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
     required=False,
     default=None,
     help="Path to base partition images for delta OTA",
@@ -216,6 +227,10 @@ def cli(payload: Path, out_dir: Path, verbose: bool, base_dir: Path, partition_n
 
         with Path(f"{out_dir}/manifest.json").open("w") as f:
             f.write(pb_json.MessageToJson(manifest))
+
+        # create a subdirectory for this payload image
+        out_dir = out_dir.joinpath(in_file.name)
+        out_dir.mkdir(parents=True, exist_ok=True)
 
         if partition_name != "":
             click.echo(f"Extracting partition {partition_name}...")
