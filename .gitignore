@@ -234,3 +234,7 @@ $RECYCLE.BIN/
 
 # and payload files
 /*.bin
+/payload.*
+
+# setuptools-scm _version file
+_version.py

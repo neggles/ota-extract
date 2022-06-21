@@ -1,11 +1,23 @@
 {
     "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length=110",
+        "--force-exclude='/(_pb2\\.py|_pb2\\.pyi)/'",
+        "--config=${workspaceFolder}/pyproject.toml"
+    ],
     "python.linting.enabled": true,
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,
     "python.linting.flake8Args": ["--config=${workspaceFolder}/setup.cfg"],
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportUndefinedVariable": "none" // protoc >=3.21 confuses pylance
+    },
     "[python]": {
         "editor.wordBasedSuggestions": false,
         "editor.formatOnSave": true
+    },
+    "[toml]": {
+        "editor.formatOnSave": true,
+        "editor.tabSize": 2
     }
 }

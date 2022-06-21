@@ -1,0 +1,4 @@
+# setuptools_scm will grab all tracked files, minus these exclusions
+prune base
+prune out
+prune .vscode

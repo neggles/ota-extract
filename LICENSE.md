@@ -1,3 +1,8 @@
+Parts of this program fall under the Apache 2.0 license. This is indicated in
+the header of those files, along with further licensing details.
+
+For all other source files, the following license applies:
+
 MIT License
 
 Copyright (c) 2022 Andrew Powers-Holmes
