@@ -5,6 +5,7 @@
 #
 
 import bz2
+import codecs
 import hashlib
 import io
 import itertools
@@ -35,7 +36,7 @@ def encode_digest(digest: bytes) -> str:
     Returns:
         The encoded digest (string)
     """
-    return digest.encode("base64").strip()
+    return str(codecs.encode(digest, "base64"), "utf-8")
 
 
 def decode_digest(hash: str) -> bytes:
@@ -47,7 +48,7 @@ def decode_digest(hash: str) -> bytes:
     Returns:
         The decoded digest (bytes)
     """
-    return hash.decode("base64")
+    return bytes(codecs.decode(hash, "base64"))
 
 
 def _verify_sha256(fileobj: io.FileIO, hash: bytes or str, name: str, length: int = -1) -> bool:
@@ -488,8 +489,7 @@ class PayloadOperator(object):
         """Applies a sequence of update operations to a partition.
 
         This assumes an in-place update semantics for MOVE and BSDIFF, namely all
-        reads are performed first, then the data is processed and written back to
-        the same file.
+        reads are performed first, then the data is processed and written back.
 
         Args:
             part_name: the partition name (str)
