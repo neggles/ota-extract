@@ -25,6 +25,7 @@ class Extent(google.protobuf.message.Message):
     run-length encoding).
     A sentinel value (kuint64max) as the start block denotes a sparse-hole
     in a file whose block-length is specified by num_blocks.
+
     """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     START_BLOCK_FIELD_NUMBER: builtins.int
@@ -52,6 +53,7 @@ class Signatures(google.protobuf.message.Message):
     selects a Signature message and uses that, along with a known public key,
     to verify the download. The public key is expected to be part of the
     client.
+
     """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     class Signature(google.protobuf.message.Message):
@@ -423,6 +425,7 @@ class PartitionUpdate(google.protobuf.message.Message):
     @property
     def hash_tree_data_extent(self) -> global___Extent:
         """On minor version 6 or newer, these fields are supported:
+
         The extent for data covered by verity hash tree.
         """
         pass
