@@ -2,10 +2,17 @@
 set -e
 
 # get the parent directory of the script
-SCRIPT_DIR=$(cd -- "$(dirname "$0")" &>/dev/null; pwd -P)
+SCRIPT_DIR=$(
+    cd -- "$(dirname "$0")" &>/dev/null
+    pwd -P
+)
 
-# change to one level up
-pushd ${SCRIPT_DIR}/.. > /dev/null
+# change to one level up from script
+pushd "${SCRIPT_DIR}/.." >/dev/null
+
+# retrieve the latest proto files
+curl -L 'https://android.googlesource.com/platform/system/update_engine/+/refs/heads/master/update_metadata.proto?format=TEXT' | base64 -d >assets/update_metadata.proto
+curl -L 'https://android.googlesource.com/platform/external/puffin/+/HEAD/src/puffin.proto?format=TEXT' | base64 -d >assets/puffin.proto
 
 # compile python module
 if (command -v protoc-gen-mypy); then
@@ -16,7 +23,7 @@ else
 fi
 
 # return to previous directory
-popd > /dev/null
+popd >/dev/null
 
 # done
 exit 0
